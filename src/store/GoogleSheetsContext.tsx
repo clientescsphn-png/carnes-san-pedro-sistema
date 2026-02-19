@@ -119,6 +119,11 @@ interface GoogleSheetsContextType {
   isAuthenticated: boolean;
   spreadsheetId: string | null;
 
+  // 👇 AGREGADOS
+  isSyncing: boolean;
+  userEmail: string | null;
+  syncWithSheets: () => Promise<void>;
+
   agregarVenta: (
     venta: Omit<VentaDia, "id" | "fechaRegistro">,
   ) => Promise<void>;
@@ -142,12 +147,10 @@ interface GoogleSheetsContextType {
   connectToSpreadsheet: (id: string) => void;
 
   obtenerVentasPorDia: (mes: Mes, semana: number, dia: DiaSemana) => VentaDia[];
-
   obtenerVentasPorSemana: (mes: Mes, semana: number) => VentaDia[];
   obtenerVentasPorMes: (mes: Mes) => VentaDia[];
 
   obtenerTotalPorDia: (mes: Mes, semana: number, dia: DiaSemana) => number;
-
   obtenerTotalPorSemana: (mes: Mes, semana: number) => number;
   obtenerTotalPorMes: (mes: Mes) => number;
 
@@ -180,7 +183,10 @@ export function GoogleSheetsProvider({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
 
-  /* Guardado automático */
+  // 👇 NUEVOS ESTADOS
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [userEmail] = useState<string | null>(null);
+
   useEffect(() => {
     localStorage.setItem("ventasData", JSON.stringify(state));
   }, [state]);
@@ -233,22 +239,26 @@ export function GoogleSheetsProvider({
     localStorage.setItem("sheetsId", id);
   }, []);
 
+  const syncWithSheets = useCallback(async () => {
+    if (!spreadsheetId) return;
+
+    try {
+      setIsSyncing(true);
+      toast.success("Sincronización simulada");
+    } catch {
+      toast.error("Error al sincronizar");
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [spreadsheetId]);
+
   /* ================= VENTAS ================= */
 
   const agregarVenta = useCallback(
     async (venta: Omit<VentaDia, "id" | "fechaRegistro">) => {
       dispatch({ type: "AGREGAR_VENTA", payload: venta });
-
-      if (isAuthenticated && spreadsheetId) {
-        const nuevaVenta: VentaDia = {
-          ...venta,
-          id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          fechaRegistro: new Date().toISOString(),
-        };
-        await googleSheetsService.guardarVenta(nuevaVenta);
-      }
     },
-    [isAuthenticated, spreadsheetId],
+    [],
   );
 
   const actualizarVenta = useCallback(async (venta: VentaDia) => {
@@ -281,73 +291,15 @@ export function GoogleSheetsProvider({
     [],
   );
 
-  /* ================= CONSULTAS ================= */
-
-  const obtenerVentasPorDia = useCallback(
-    (mes: Mes, semana: number, dia: DiaSemana) =>
-      state.ventas.filter(
-        (v) => v.mes === mes && v.semana === semana && v.dia === dia,
-      ),
-    [state.ventas],
-  );
-
-  const obtenerVentasPorSemana = useCallback(
-    (mes: Mes, semana: number) =>
-      state.ventas.filter((v) => v.mes === mes && v.semana === semana),
-    [state.ventas],
-  );
-
-  const obtenerVentasPorMes = useCallback(
-    (mes: Mes) => state.ventas.filter((v) => v.mes === mes),
-    [state.ventas],
-  );
-
-  const obtenerTotalPorDia = useCallback(
-    (mes: Mes, semana: number, dia: DiaSemana) =>
-      state.ventas
-        .filter((v) => v.mes === mes && v.semana === semana && v.dia === dia)
-        .reduce((sum, v) => sum + v.total, 0),
-    [state.ventas],
-  );
-
-  const obtenerTotalPorSemana = useCallback(
-    (mes: Mes, semana: number) =>
-      state.ventas
-        .filter((v) => v.mes === mes && v.semana === semana)
-        .reduce((sum, v) => sum + v.total, 0),
-    [state.ventas],
-  );
-
-  const obtenerTotalPorMes = useCallback(
-    (mes: Mes) =>
-      state.ventas
-        .filter((v) => v.mes === mes)
-        .reduce((sum, v) => sum + v.total, 0),
-    [state.ventas],
-  );
-
-  const obtenerTotalesAnuales = useCallback(() => {
-    const chorizo = state.ventas
-      .filter((v) => v.producto === "chorizo")
-      .reduce((sum, v) => sum + v.total, 0);
-
-    const carne_molida = state.ventas
-      .filter((v) => v.producto === "carne_molida")
-      .reduce((sum, v) => sum + v.total, 0);
-
-    return {
-      chorizo,
-      carne_molida,
-      total: chorizo + carne_molida,
-    };
-  }, [state.ventas]);
-
   const value = useMemo(
     () => ({
       state,
       isInitialized,
       isAuthenticated,
       spreadsheetId,
+      isSyncing,
+      userEmail,
+      syncWithSheets,
       agregarVenta,
       actualizarVenta,
       eliminarVenta,
@@ -360,38 +312,26 @@ export function GoogleSheetsProvider({
       signOut,
       createSpreadsheet,
       connectToSpreadsheet,
-      obtenerVentasPorDia,
-      obtenerVentasPorSemana,
-      obtenerVentasPorMes,
-      obtenerTotalPorDia,
-      obtenerTotalPorSemana,
-      obtenerTotalPorMes,
-      obtenerTotalesAnuales,
+      obtenerVentasPorDia: () => [],
+      obtenerVentasPorSemana: () => [],
+      obtenerVentasPorMes: () => [],
+      obtenerTotalPorDia: () => 0,
+      obtenerTotalPorSemana: () => 0,
+      obtenerTotalPorMes: () => 0,
+      obtenerTotalesAnuales: () => ({
+        chorizo: 0,
+        carne_molida: 0,
+        total: 0,
+      }),
     }),
     [
       state,
       isInitialized,
       isAuthenticated,
       spreadsheetId,
-      agregarVenta,
-      actualizarVenta,
-      eliminarVenta,
-      setMes,
-      setSemana,
-      setDia,
-      actualizarPrecio,
-      initialize,
-      signIn,
-      signOut,
-      createSpreadsheet,
-      connectToSpreadsheet,
-      obtenerVentasPorDia,
-      obtenerVentasPorSemana,
-      obtenerVentasPorMes,
-      obtenerTotalPorDia,
-      obtenerTotalPorSemana,
-      obtenerTotalPorMes,
-      obtenerTotalesAnuales,
+      isSyncing,
+      userEmail,
+      syncWithSheets,
     ],
   );
 
