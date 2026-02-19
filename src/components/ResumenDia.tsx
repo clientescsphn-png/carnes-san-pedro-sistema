@@ -4,7 +4,6 @@ import { NOMBRES_PAQUETE } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatLempira } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -16,6 +15,14 @@ import {
 import { Trash2, TrendingUp, Package, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+
+/* 🔥 Formateador de moneda local */
+const formatLempira = (valor: number) => {
+  return new Intl.NumberFormat("es-HN", {
+    style: "currency",
+    currency: "HNL",
+  }).format(valor);
+};
 
 export function ResumenDia() {
   const { state, obtenerVentasPorDia, eliminarVenta, obtenerTotalPorDia } =
@@ -38,10 +45,10 @@ export function ResumenDia() {
     toast.success("Venta eliminada");
   };
 
-  // Agrupar ventas por producto y paquete
   const ventasAgrupadas = ventasDia.reduce(
     (acc, venta) => {
-      const key = `L{venta.producto}-L{venta.paquete}`;
+      const key = `${venta.producto}-${venta.paquete}`;
+
       if (!acc[key]) {
         acc[key] = {
           producto: venta.producto,
@@ -51,8 +58,10 @@ export function ResumenDia() {
           id: venta.id,
         };
       }
+
       acc[key].unidades += venta.unidades;
       acc[key].total += venta.total;
+
       return acc;
     },
     {} as Record<
@@ -69,7 +78,6 @@ export function ResumenDia() {
 
   const ventasArray = Object.values(ventasAgrupadas);
 
-  // Calcular totales por producto
   const totalChorizo = ventasDia
     .filter((v) => v.producto === "chorizo")
     .reduce((sum, v) => sum + v.total, 0);
@@ -86,10 +94,12 @@ export function ResumenDia() {
             <Calendar className="h-5 w-5 text-blue-600" />
             Resumen del Día
           </CardTitle>
+
           <Badge variant="secondary" className="text-sm font-semibold">
-            ${totalDia.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+            {formatLempira(totalDia)}
           </Badge>
         </div>
+
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <span>{state.mesSeleccionado}</span>
           <span>•</span>
@@ -98,6 +108,7 @@ export function ResumenDia() {
           <span>{state.diaSeleccionado}</span>
         </div>
       </CardHeader>
+
       <CardContent>
         {ventasArray.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
@@ -110,17 +121,18 @@ export function ResumenDia() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[100px]">Producto</TableHead>
+                    <TableHead>Producto</TableHead>
                     <TableHead>Paquete</TableHead>
                     <TableHead className="text-right">Unid.</TableHead>
                     <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {ventasArray.map((venta) => (
                     <TableRow key={venta.id}>
-                      <TableCell className="font-medium capitalize">
+                      <TableCell>
                         <Badge
                           variant={
                             venta.producto === "chorizo"
@@ -132,18 +144,17 @@ export function ResumenDia() {
                           {venta.producto === "chorizo" ? "Chorizo" : "Carne"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm">
-                        {NOMBRES_PAQUETE[venta.paquete]}
-                      </TableCell>
+
+                      <TableCell>{NOMBRES_PAQUETE[venta.paquete]}</TableCell>
+
                       <TableCell className="text-right">
                         {venta.unidades}
                       </TableCell>
+
                       <TableCell className="text-right font-medium">
-                        $
-                        {venta.total.toLocaleString("es-MX", {
-                          minimumFractionDigits: 2,
-                        })}
+                        {formatLempira(venta.total)}
                       </TableCell>
+
                       <TableCell>
                         <Button
                           variant="ghost"
@@ -167,22 +178,17 @@ export function ResumenDia() {
                   Chorizo
                 </div>
                 <div className="text-xl font-bold text-amber-800">
-                  $
-                  {totalChorizo.toLocaleString("es-MX", {
-                    minimumFractionDigits: 2,
-                  })}
+                  {formatLempira(totalChorizo)}
                 </div>
               </div>
+
               <div className="bg-red-50 p-3 rounded-lg">
                 <div className="flex items-center gap-2 text-red-700 text-sm font-medium">
                   <TrendingUp className="h-4 w-4" />
                   Carne Molida
                 </div>
                 <div className="text-xl font-bold text-red-800">
-                  $
-                  {totalCarneMolida.toLocaleString("es-MX", {
-                    minimumFractionDigits: 2,
-                  })}
+                  {formatLempira(totalCarneMolida)}
                 </div>
               </div>
             </div>
